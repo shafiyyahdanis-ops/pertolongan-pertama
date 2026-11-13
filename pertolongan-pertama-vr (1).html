@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pertolongan Pertama VR</title>
+  <!-- A-Frame: coba file lokal dulu, lalu beberapa CDN cadangan -->
+  <script src="aframe.min.js"></script>
+  <script>window.AFRAME || document.write('<script src="https://cdn.jsdelivr.net/npm/aframe@1.5.0/dist/aframe.min.js"><\/script>')</script>
+  <script>window.AFRAME || document.write('<script src="https://aframe.io/releases/1.5.0/aframe.min.js"><\/script>')</script>
+  <script>window.AFRAME || document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/aframe/1.5.0/aframe.min.js"><\/script>')</script>
+</head>
+<body>
+<!--
+  PERTOLONGAN PERTAMA VR
+  Halaman : Beranda, Luka Jatuh, Luka Bakar, Keracunan, Mimisan, Tersedak, Kuis
+  Interaksi: klik / tatap (fuse 1,5 detik) tombol dan titik kuning bernomor (langkah penanganan).
+  Revisi dari "Rumah Adat Nusantara VR": rumah adat diganti simulasi animasi kejadian.
+-->
+<a-scene background="color: #101830" renderer="antialias: true" vr-mode-ui="enabled: true">
+  <a-light type="ambient" color="#ffffff" intensity="0.75"></a-light>
+  <a-light type="directional" color="#fff3d6" intensity="0.8" position="3 6 4"></a-light>
+  <a-circle id="ground" radius="16" rotation="-90 0 0" position="0 0 -5" color="#2f3b2f"></a-circle>
+  <a-entity id="cursor-mouse" cursor="rayOrigin: mouse; fuse: false" raycaster="objects: .btn; far: 40"></a-entity>
+  <a-entity position="0 1.6 0">
+    <a-camera look-controls wasd-controls-enabled="false">
+      <a-entity id="cursor-gaze" visible="false" position="0 0 -1"
+                cursor="fuse: true; fuseTimeout: 1500"
+                raycaster="objects: .btn; far: 40; enabled: false"
+                geometry="primitive: ring; radiusInner: 0.012; radiusOuter: 0.02"
+                material="color: #ffffff; shader: flat"
+                animation__fuse="property: scale; startEvents: fusing; from: 1 1 1; to: 0.3 0.3 0.3; dur: 1500; easing: easeInQuad"
+                animation__reset="property: scale; startEvents: mouseleave, click; to: 1 1 1; dur: 100"></a-entity>
+    </a-camera>
+  </a-entity>
+</a-scene>
+
+<script>
+if (!window.AFRAME) {
+  document.body.insertAdjacentHTML('afterbegin', '<p style="font:18px sans-serif;padding:24px;color:#b91c1c">A-Frame gagal dimuat. Download aframe.min.js, simpan satu folder dengan file ini, lalu refresh.</p>');
+  throw new Error('A-Frame tidak termuat');
+}
+/* ================= DATA ================= */
+const CASES = {
+  jatuh: {
+    name: 'Luka Jatuh', region: 'Lecet, memar, dan benturan',
+    sky: '#b7d9f0', ground: '#5a7d3a', build: buildJatuh,
+    summary: 'Terjadi saat tersandung atau terpeleset. Bisa berupa lecet, memar, luka berdarah, bahkan patah tulang atau cedera kepala.\n\nPastikan tempat aman, lalu ikuti 4 langkah bernomor di sekitar korban.',
+    steps: [
+      ['Tenangkan & Periksa', 'Tenangkan korban dan cek kesadarannya. Jangan gerakkan bila nyeri hebat di leher, punggung, atau kepala, atau dicurigai patah tulang. Panggil bantuan.'],
+      ['Hentikan Perdarahan', 'Tekan luka dengan kain bersih selama 5-10 menit. Angkat bagian yang terluka lebih tinggi dari jantung jika memungkinkan.'],
+      ['Bersihkan Luka', 'Alirkan air bersih dan sabun lembut pada luka lecet untuk membuang kotoran. Tidak perlu digosok keras.'],
+      ['Tutup & Pantau', 'Tutup dengan kasa bersih. Ke dokter bila luka dalam, darah tak berhenti, atau korban pusing, muntah, mengantuk setelah kepala terbentur.']
+    ]
+  },
+  bakar: {
+    name: 'Luka Bakar', region: 'Air panas, api, dan uap',
+    sky: '#f3d9b8', ground: '#7a5a3a', build: buildBakar,
+    summary: 'Disebabkan air panas, api, uap, atau benda panas. Kulit memerah, nyeri, atau melepuh.\n\nKunci utamanya: dinginkan luka dengan air mengalir secepatnya.',
+    steps: [
+      ['Jauhkan dari Panas', 'Hentikan kontak dengan sumber panas. Lepas perhiasan atau pakaian di sekitar luka sebelum bengkak, kecuali yang menempel pada kulit.'],
+      ['Aliri Air Mengalir', 'Siram dengan air mengalir bersuhu normal sekitar 20 menit. Jangan memakai es karena dapat merusak kulit.'],
+      ['Tutup Longgar', 'Tutup dengan kain bersih tidak berbulu atau plastik pembungkus makanan, tanpa menekan. Jangan memecahkan lepuh.'],
+      ['Hindari Pantangan', 'Jangan oleskan pasta gigi, mentega, atau kecap. Segera ke dokter bila luka luas, di wajah, tangan, atau kelamin, atau terjadi pada anak dan lansia.']
+    ]
+  },
+  racun: {
+    name: 'Keracunan', region: 'Bahan kimia, obat, dan makanan',
+    sky: '#d8e6c0', ground: '#4f6b3a', build: buildRacun,
+    summary: 'Terjadi saat zat berbahaya tertelan, terhirup, atau terkena kulit, misalnya cairan pembersih, obat berlebih, atau makanan basi.\n\nGejala: mual, pusing, lemas, sesak, atau tidak sadar.',
+    steps: [
+      ['Amankan Situasi', 'Jauhkan korban dari sumber racun dan beri udara segar bila terhirup. Lindungi diri sendiri, jangan menyentuh zat berbahaya tanpa pelindung.'],
+      ['Cek Kesadaran', 'Periksa napas dan respons korban. Bila pingsan, kejang, atau sesak, segera hubungi 112 atau 119.'],
+      ['Simpan Bukti', 'Ambil kemasan atau sisa zat untuk ditunjukkan ke petugas medis. Catat jenis zat, jumlah, dan waktunya.'],
+      ['Jangan Paksa Muntah', 'Jangan memaksa muntah atau memberi susu atau minuman tanpa arahan tenaga medis. Segera bawa ke fasilitas kesehatan.']
+    ]
+  },
+  mimisan: {
+    name: 'Mimisan', region: 'Perdarahan dari hidung',
+    sky: '#e6d0f0', ground: '#5a6a7a', build: buildMimisan,
+    summary: 'Biasanya disebabkan udara kering, mengorek hidung, atau benturan ringan. Umumnya tidak berbahaya dan bisa ditangani sendiri.\n\nPosisi tubuh yang benar sangat penting.',
+    steps: [
+      ['Duduk Condong', 'Duduk tegak dan condongkan badan ke depan agar darah tidak tertelan. Jangan mendongak atau berbaring.'],
+      ['Jepit Hidung', 'Jepit bagian lunak hidung selama 10 menit tanpa dilepas, dan bernapas lewat mulut.'],
+      ['Kompres Dingin', 'Tempelkan kompres dingin di pangkal hidung dan pipi. Keluarkan darah di mulut, jangan ditelan.'],
+      ['Kapan ke Dokter', 'Ke dokter bila darah belum berhenti setelah 20 menit, sangat deras, atau akibat benturan keras di kepala. Jangan mengorek hidung setelahnya.']
+    ]
+  },
+  tersedak: {
+    name: 'Tersedak', region: 'Benda menyumbat saluran napas',
+    sky: '#f0d0d0', ground: '#6a4a4a', build: buildTersedak,
+    summary: 'Terjadi saat makanan atau benda kecil menyumbat saluran napas. Korban memegang leher, sulit bicara atau batuk, dan wajah membiru.\n\nBertindak cepat bisa menyelamatkan nyawa.',
+    steps: [
+      ['Tanya & Dorong Batuk', 'Tanya, "Apakah kamu tersedak?" Bila masih bisa batuk atau bicara, minta terus batuk kuat dan jangan menepuk punggung.'],
+      ['Tepuk Punggung', 'Bila tidak bisa bersuara, minta bantuan lalu tepuk punggung di antara tulang belikat 5 kali dengan tumit tangan.'],
+      ['Hentakan Perut', 'Dari belakang, kepalkan tangan di atas pusar lalu hentak ke dalam dan ke atas 5 kali. Ulangi bergantian dengan tepukan punggung.'],
+      ['Bayi & Pingsan', 'Pada bayi, tepuk punggung dan tekan dada dengan dua jari, bukan hentakan perut. Bila korban pingsan, mulai CPR dan hubungi 112 atau 119.']
+    ]
+  }
+};
+const KEYS = ['jatuh', 'bakar', 'racun', 'mimisan', 'tersedak'];
+const HP = [[-1, 1.9, 0.3], [1, 1.9, 0.3], [-1, 0.9, 0.3], [1, 0.9, 0.3]];
+
+const QUIZ = [
+  { q: 'Posisi yang benar saat mimisan?',                   o: ['Mendongak', 'Duduk condong ke depan', 'Berbaring'], a: 1 },
+  { q: 'Langkah awal pada luka bakar?',                     o: ['Oles pasta gigi', 'Aliri air mengalir', 'Pecahkan lepuh'], a: 1 },
+  { q: 'Pada korban keracunan, sebaiknya...',               o: ['Dipaksa muntah', 'Diminumi susu', 'Cek napas, cari bantuan'], a: 2 },
+  { q: 'Dewasa tersedak dan tidak bisa bersuara. Lakukan?', o: ['Beri minum', 'Tepuk punggung + hentakan perut', 'Tunggu saja'], a: 1 },
+  { q: 'Luka jatuh berdarah, langkah awalnya?',             o: ['Tekan dengan kain bersih', 'Tiup luka', 'Beri bedak'], a: 0 }
+];
+
+/* ================= HELPER ================= */
+const scene = document.querySelector('a-scene');
+const pages = {};
+function mk(tag, attrs, parent) {
+  const e = document.createElement(tag);
+  for (const k in (attrs || {})) e.setAttribute(k, attrs[k]);
+  (parent || scene).appendChild(e);
+  return e;
+}
+function text(parent, value, x, y, width, opts) {
+  return mk('a-text', Object.assign({
+    value: value, position: `${x} ${y} 0.02`, width: width,
+    align: 'center', color: '#ffffff', 'wrap-count': 30
+  }, opts || {}), parent);
+}
+function btn(parent, label, x, y, w, h, color, fn, isNav) {
+  const b = mk('a-plane', { position: `${x} ${y} 0.03`, width: w, height: h, color: color, class: 'btn' }, parent);
+  if (!isNav) b.setAttribute('data-b', '');
+  b._t = mk('a-text', { value: label, align: 'center', color: '#fff', width: w * 1.7, 'wrap-count': 18, position: '0 0 0.02' }, b);
+  b.addEventListener('click', fn);
+  b.addEventListener('mouseenter', () => b.setAttribute('scale', '1.08 1.08 1'));
+  b.addEventListener('mouseleave', () => b.setAttribute('scale', '1 1 1'));
+  return b;
+}
+function setBtn(b, on) {
+  b.setAttribute('visible', on);
+  on ? b.classList.add('btn') : b.classList.remove('btn');
+}
+function panel(parent, w, h, x, y) {
+  return mk('a-plane', { width: w, height: h, position: `${x} ${y} 0`, color: '#0b1230', opacity: 0.88 }, parent);
+}
+function refreshRay() {
+  ['cursor-mouse', 'cursor-gaze'].forEach(id => {
+    const c = document.getElementById(id);
+    if (c && c.components && c.components.raycaster) c.components.raycaster.refreshObjects();
+  });
+}
+/* animasi berulang: an(elemen, nama, properti, dari, ke, durasi, opsi) */
+function an(e, n, prop, from, to, dur, extra) {
+  e.setAttribute('animation__' + n, `property: ${prop}; from: ${from}; to: ${to}; dur: ${dur}; loop: true; ${extra || 'dir: alternate; easing: easeInOutSine'}`);
+}
+
+/* ================= MODEL SIMULASI (OBJEK PRIMITIF + ANIMASI) ================= */
+function person(g, shirt, face) {
+  const p = mk('a-entity', {}, g);
+  [-0.15, 0.15].forEach(x => mk('a-cylinder', { radius: 0.1, height: 0.8, position: `${x} 0.4 0`, color: '#1e3a8a' }, p));
+  mk('a-cylinder', { radius: 0.26, height: 0.75, position: '0 1.15 0', color: shirt }, p);
+  p.head = mk('a-sphere', { radius: 0.22, position: '0 1.75 0', color: face }, p);
+  mk('a-sphere', { radius: 0.04, position: '0 1.73 0.21', color: face }, p);
+  [-0.08, 0.08].forEach(x => mk('a-sphere', { radius: 0.025, position: `${x} 1.8 0.19`, color: '#111111' }, p));
+  p.armL = mk('a-cylinder', { radius: 0.06, height: 0.65, position: '-0.34 1.15 0', color: face }, p);
+  p.armR = mk('a-cylinder', { radius: 0.06, height: 0.65, position: '0.34 1.15 0', color: face }, p);
+  return p;
+}
+function drops(p, color, x, y0, y1, z, n, dur, r) {
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const d = mk('a-sphere', { radius: r, position: `${x} ${y0} ${z}`, color: color }, p);
+    out.push(d);
+    an(d, 'd', 'position', `${x} ${y0} ${z}`, `${x} ${y1} ${z}`, dur, `dir: normal; easing: linear; delay: ${i * dur / n}`);
+  }
+  return out;
+}
+/* Luka jatuh: tersandung kulit pisang, lutut berdarah */
+function buildJatuh(g) {
+  const p = person(g, '#16a34a', '#f1c27d');
+  an(p, 'f', 'rotation', '0 0 0', '0 0 -78', 1100, 'dir: alternate; easing: easeInQuad; delay: 600');
+  mk('a-sphere', { radius: 0.07, position: '0.15 0.45 0.1', color: '#b91c1c' }, p);
+  drops(p, '#dc2626', 0.15, 0.4, 0.05, 0.15, 2, 900, 0.025);
+  mk('a-box', { width: 0.5, height: 0.04, depth: 0.22, position: '-0.3 0.02 0.35', rotation: '0 30 0', color: '#facc15' }, g);
+}
+/* Luka bakar: tangan terkena air panas dari ketel, uap naik */
+function buildBakar(g) {
+  const p = person(g, '#f97316', '#f1c27d');
+  an(p, 's', 'rotation', '0 0 -4', '0 0 4', 250);
+  p.armR.setAttribute('position', '0.3 1.3 0.28');
+  p.armR.setAttribute('rotation', '110 0 0');
+  p.armR.setAttribute('color', '#ef4444');
+  const h = mk('a-sphere', { radius: 0.08, position: '0.3 1.2 0.58', color: '#dc2626' }, p);
+  an(h, 'p', 'scale', '1 1 1', '1.5 1.5 1.5', 350);
+  mk('a-box', { width: 0.9, height: 0.06, depth: 0.6, position: '0.3 1 0.8', color: '#8d6e63' }, g);
+  mk('a-cylinder', { radius: 0.05, height: 1, position: '0.3 0.5 0.8', color: '#6d4c41' }, g);
+  mk('a-cylinder', { radius: 0.15, height: 0.3, position: '0.3 1.18 0.8', color: '#9ca3af' }, g);
+  for (let i = 0; i < 3; i++) {
+    const s = mk('a-sphere', { radius: 0.07, position: '0.3 1.4 0.8', material: 'color: #ffffff; transparent: true; opacity: 0.6' }, g);
+    an(s, 's', 'position', '0.3 1.4 0.8', '0.3 2 0.8', 1400, `dir: normal; easing: linear; delay: ${i * 450}`);
+  }
+}
+/* Keracunan: botol tumpah, korban pusing dengan bintang berputar */
+function buildRacun(g) {
+  const p = person(g, '#2563eb', '#a3c76d');
+  an(p, 's', 'rotation', '0 0 -6', '0 0 6', 900);
+  const st = mk('a-entity', { position: '0 2.15 0' }, p);
+  an(st, 'r', 'rotation', '0 0 0', '0 360 0', 1800, 'dir: normal; easing: linear');
+  [0, 120, 240].forEach(a => {
+    const r = a * Math.PI / 180;
+    mk('a-sphere', { radius: 0.05, position: `${(0.3 * Math.cos(r)).toFixed(2)} 0 ${(0.3 * Math.sin(r)).toFixed(2)}`, color: '#facc15' }, st);
+  });
+  mk('a-cylinder', { radius: 0.12, height: 0.4, position: '0.8 0.2 0.4', color: '#16a34a' }, g);
+  mk('a-cylinder', { radius: 0.05, height: 0.15, position: '0.8 0.475 0.4', color: '#15803d' }, g);
+  mk('a-plane', { width: 0.12, height: 0.14, position: '0.8 0.22 0.521', color: '#ffffff' }, g);
+  mk('a-text', { value: 'X', color: '#dc2626', width: 1, align: 'center', position: '0.8 0.22 0.524' }, g);
+  mk('a-circle', { radius: 0.3, rotation: '-90 0 0', position: '0.8 0.01 0.65', color: '#65a30d' }, g);
+}
+/* Mimisan: darah menetes dari hidung */
+function buildMimisan(g) {
+  const p = person(g, '#7c3aed', '#f1c27d');
+  an(p, 's', 'rotation', '0 0 -2', '0 0 2', 1200);
+  mk('a-sphere', { radius: 0.03, position: '0 1.68 0.21', color: '#dc2626' }, p);
+  drops(p, '#dc2626', 0, 1.7, 1.0, 0.25, 3, 1100, 0.03);
+}
+/* Tersedak: tangan memegang leher, tubuh bergetar, wajah membiru */
+function buildTersedak(g) {
+  const p = person(g, '#dc2626', '#9db4e0');
+  an(p, 's', 'position', '-0.04 0 0', '0.04 0 0', 110);
+  p.armL.setAttribute('position', '-0.2 1.55 0.2'); p.armL.setAttribute('rotation', '65 0 -15');
+  p.armR.setAttribute('position', '0.2 1.55 0.2');  p.armR.setAttribute('rotation', '65 0 15');
+  const f = mk('a-sphere', { radius: 0.09, position: '0 1.55 0.18', color: '#f59e0b' }, p);
+  an(f, 'p', 'scale', '1 1 1', '1.4 1.4 1.4', 400);
+  const t = mk('a-text', { value: '!', color: '#ef4444', width: 3, align: 'center', position: '0 2.35 0' }, g);
+  an(t, 'p', 'scale', '1 1 1', '1.5 1.5 1.5', 350);
+}
+
+/* ================= NAVIGASI HALAMAN ================= */
+let current = 'home';
+function showPage(n) {
+  current = n;
+  for (const k in pages) {
+    const on = (k === n);
+    pages[k].setAttribute('visible', on);
+    pages[k].querySelectorAll('[data-b]').forEach(b => on ? b.classList.add('btn') : b.classList.remove('btn'));
+  }
+  const ground = document.getElementById('ground');
+  if (CASES[n]) {
+    scene.setAttribute('background', 'color: ' + CASES[n].sky);
+    ground.setAttribute('color', CASES[n].ground);
+    showInfo(pages[n], CASES[n].name, CASES[n].region, CASES[n].summary);
+  } else {
+    scene.setAttribute('background', 'color: #101830');
+    ground.setAttribute('color', '#2f3b2f');
+  }
+  if (n === 'quiz') startQuiz();
+  if (CLIPS[n]) startClip(n); else stopClip();
+  refreshRay();
+}
+
+/* ================= ANIMASI PEMBUKA: ANAK JATUH (zoom in / zoom out) ================= */
+const clip = { timers: [], stage: null };
+const K0 = [0.3, 1.2, 0];                       // titik fokus shot lebar
+function later(ms, fn) { clip.timers.push(setTimeout(fn, ms)); }
+/* posisi "panggung" agar titik K (koordinat lokal) tampil di depan kamera pada skala s dan jarak d */
+function camPos(K, s, d) { return [-s * K[0], 1.2 - s * K[1], -d - s * K[2]]; }
+function cam(K, s, d, dur) {
+  clip.stage.setAttribute('animation__p', `property: position; to: ${camPos(K, s, d).join(' ')}; dur: ${dur}; easing: easeInOutCubic`);
+  clip.stage.setAttribute('animation__s', `property: scale; to: ${s} ${s} ${s}; dur: ${dur}; easing: easeInOutCubic`);
+}
+function sub(t) { clip.sub.setAttribute('value', t); clip.back.setAttribute('visible', !!t); }
+function fade(o, dur) { clip.fade.setAttribute('animation__f', `property: material.opacity; to: ${o}; dur: ${dur}; easing: linear`); }
+function say(parent, msg, pos, color) {
+  const t = mk('a-text', { value: msg, color: color, width: 3.5, 'wrap-count': 20, align: 'center', position: pos }, parent);
+  an(t, 'p', 'scale', '1 1 1', '1.15 1.15 1.15', 400);
+  return t;
+}
+function tree(g, x, z, s) {
+  const t = mk('a-entity', { position: `${x} 0 ${z}`, scale: `${s} ${s} ${s}` }, g);
+  mk('a-cylinder', { radius: 0.12, height: 1, position: '0 0.5 0', color: '#5d4037' }, t);
+  mk('a-sphere', { radius: 0.65, position: '0 1.4 0', color: '#2e7d32' }, t);
+}
+function kid(parent, x, z, face, shirt, skin) {
+  const w = mk('a-entity', { position: `${x} 0 ${z}` }, parent);
+  const f = mk('a-entity', { rotation: `0 ${face} 0` }, w);
+  const s = mk('a-entity', { scale: '0.75 0.75 0.75' }, f);
+  w.p = person(s, shirt, skin);
+  return w;
+}
+function setUI(on) {
+  const p = pages[clip.key];
+  [p._ui.pg, p._ui.model].forEach(e => {
+    e.setAttribute('visible', on);
+    e.querySelectorAll('[data-b]').forEach(b => on ? b.classList.add('btn') : b.classList.remove('btn'));
+  });
+  setBtn(p._skip, !on);
+  refreshRay();
+}
+function stopClip(done) {
+  clip.timers.forEach(clearTimeout);
+  clip.timers = [];
+  if (clip.stage) { clip.stage.parentNode.removeChild(clip.stage); clip.stage = null; }
+  if (clip.ov) {
+    clip.ov.setAttribute('visible', false);
+    clip.bars.setAttribute('visible', false);
+    clip.fade.removeAttribute('animation__f');
+    clip.fade.setAttribute('material', 'opacity', 0);
+  }
+  if (done) setUI(true);
+}
+const CLIPS = {};
+/* Jalankan animasi pembuka untuk halaman `key`; tiap clip mengembalikan durasinya (ms) */
+function startClip(key) {
+  stopClip();
+  clip.key = key;
+  setUI(false);
+  clip.ov.setAttribute('visible', true);
+  clip.bars.setAttribute('visible', !scene.is('vr-mode'));
+  const st = clip.stage = mk('a-entity', { position: camPos(K0, 1, 7).join(' ') }, pages[key]);
+  mk('a-circle', { radius: 10, rotation: '-90 0 0', position: '0 0.01 0', color: CASES[key].ground }, st);
+  const T = CLIPS[key](st);
+  later(T - 600, () => fade(1, 500));
+  later(T, () => { stopClip(true); clip.fade.setAttribute('material', 'opacity', 1); fade(0, 500); });
+}
+function table(g, x) {
+  mk('a-box', { width: 1, height: 0.06, depth: 0.6, position: `${x} 0.75 0`, color: '#8d6e63' }, g);
+  mk('a-cylinder', { radius: 0.05, height: 0.75, position: `${x} 0.375 0`, color: '#6d4c41' }, g);
+}
+/* lengan menjangkau ke depan (sx = -1 untuk lengan kiri, yang menghadap kamera saat anak menghadap kanan) */
+function reach(arm, sx) {
+  arm.setAttribute('animation__a', `property: position; from: ${0.34 * sx} 1.15 0; to: ${0.3 * sx} 1.3 0.28; dur: 600; easing: easeOutQuad`);
+  arm.setAttribute('animation__b', 'property: rotation; from: 0 0 0; to: 110 0 0; dur: 600; easing: easeOutQuad');
+}
+function rm(st, e) { if (e && e.parentNode === st) st.removeChild(e); }
+
+CLIPS.jatuh = function (st) {
+  [[-5, -3], [5, -4], [-8, -6], [8, -2], [0, -8]].forEach(t => tree(st, t[0], t[1], 1.2));
+  mk('a-box', { width: 0.5, height: 0.04, depth: 0.22, position: '-0.3 0.02 0', rotation: '0 20 0', color: '#facc15' }, st);
+  const A = kid(st, -3.5, 0, 90, '#16a34a', '#f1c27d');
+  const B = kid(st, 3.2, 1, -90, '#eab308', '#e0a96d');
+  let aw = null;
+
+  /* Shot 1: shot lebar, dua anak bermain, kamera perlahan zoom in */
+  an(A.p, 'b', 'position', '0 0 0', '0 0.06 0', 160);
+  A.setAttribute('animation__x', 'property: position; from: -3.5 0 0; to: -0.3 0 0; dur: 2600; easing: linear');
+  B.setAttribute('animation__x', 'property: position; from: 3.2 0 1; to: 2 0 1; dur: 2600; easing: linear');
+  sub('Dua anak sedang bermain di taman.');
+  later(50, () => cam(K0, 1.25, 7, 2500));
+
+  /* Anak terpeleset kulit pisang lalu jatuh */
+  later(2600, () => {
+    sub('Oops! Terpeleset kulit pisang!');
+    A.p.removeAttribute('animation__b');
+    A.removeAttribute('animation__x');
+    A.setAttribute('animation__r', 'property: rotation; from: 0 0 0; to: 0 0 -78; dur: 450; easing: easeInQuad');
+    A.setAttribute('animation__y', 'property: position; from: -0.3 0 0; to: 0.1 0.15 0; dur: 450; easing: easeOutQuad');
+  });
+  later(3100, () => {
+    mk('a-sphere', { radius: 0.07, position: '0.15 0.45 0.1', color: '#b91c1c' }, A.p);
+    drops(A.p, '#dc2626', 0.15, 0.4, 0.05, 0.15, 2, 900, 0.025);
+    aw = say(st, 'AUW!', '0.5 1 0.3', '#ef4444');
+    sub('Lututnya lecet dan berdarah.');
+  });
+
+  /* Shot 2: ZOOM IN ke lutut yang terluka */
+  later(3500, () => cam([0.46, 0.2, 0.08], 3, 3.2, 1500));
+
+  /* Shot 3: ZOOM OUT, teman datang membantu */
+  later(5800, () => {
+    sub('Temannya segera datang membantu.');
+    if (aw) st.removeChild(aw);
+    cam([0.9, 1.2, 0.3], 1.3, 7, 1600);
+    B.removeAttribute('animation__x');
+    B.setAttribute('animation__y', 'property: position; from: 2 0 1; to: 1 0 1; dur: 1400; easing: easeInOutSine');
+  });
+  later(7000, () => {
+    say(st, 'Kamu tidak apa-apa?', '1 2 1', '#ffffff');
+    sub('Tenang, ikuti 4 langkah pertolongan pertama.');
+  });
+
+  return 9300;
+};
+
+/* Luka bakar: anak menyentuh ketel panas, air tumpah mengenai tangan */
+CLIPS.bakar = function (st) {
+  const g = mk('a-entity', { position: '0 0 0.22' }, st);
+  table(g, 0.35);
+  mk('a-box', { width: 0.5, height: 0.1, depth: 0.4, position: '0.33 0.83 0', color: '#374151' }, g);
+  mk('a-cylinder', { radius: 0.2, height: 0.02, position: '0.33 0.885 0', color: '#ef4444' }, g);
+  const kt = mk('a-entity', { position: '0.33 1.03 0' }, g);
+  mk('a-cylinder', { radius: 0.15, height: 0.3, color: '#9ca3af' }, kt);
+  mk('a-sphere', { radius: 0.04, position: '0 0.17 0', color: '#6b7280' }, kt);
+  for (let i = 0; i < 3; i++) {
+    const s = mk('a-sphere', { radius: 0.07, position: '0.33 1.3 0', material: 'color: #ffffff; transparent: true; opacity: 0.6' }, g);
+    an(s, 's', 'position', '0.33 1.3 0', '0.33 1.9 0', 1400, `dir: normal; easing: linear; delay: ${i * 450}`);
+  }
+  const K = kid(st, -3, 0, 90, '#f97316', '#f1c27d');
+  const B = kid(st, 3.4, 1, -90, '#ec4899', '#e0a96d');
+  let aw = null, dr = [];
+  K.setAttribute('animation__x', 'property: position; from: -3 0 0; to: -0.3 0 0; dur: 2200; easing: linear');
+  an(K.p, 'b', 'position', '0 0 0', '0 0.06 0', 160);
+  sub('Ketel berisi air mendidih berada dalam jangkauan anak.');
+  later(50, () => cam(K0, 1.25, 7, 2400));
+  later(2300, () => { K.p.removeAttribute('animation__b'); reach(K.p.armL, -1); sub('Karena penasaran, ia menyentuh ketel.'); });
+  later(3000, () => {
+    kt.setAttribute('animation__t', 'property: rotation; from: 0 0 0; to: 0 0 25; dur: 500; easing: easeInQuad');
+    dr = drops(g, '#38bdf8', 0.14, 1.0, 0.8, 0, 4, 500, 0.04);
+    K.p.armL.setAttribute('color', '#ef4444');
+    const h = mk('a-sphere', { radius: 0.08, position: '-0.3 1.2 0.58', color: '#dc2626' }, K.p);
+    an(h, 'p', 'scale', '1 1 1', '1.5 1.5 1.5', 350);
+    aw = say(st, 'AAH, PANAS!', '-0.3 1.9 0.2', '#ef4444');
+    sub('Air panas tumpah mengenai tangan.');
+  });
+  later(3500, () => cam([0.14, 0.9, 0.22], 3, 3.2, 1500));
+  later(3700, () => sub('Panas merusak lapisan kulit: merah, nyeri, lalu melepuh.'));
+  later(5800, () => {
+    rm(st, aw); dr.forEach(d => rm(g, d));
+    sub('Anak mundur sambil menangis. Orang dewasa segera datang.');
+    cam(K0, 1.25, 7, 1600);
+    K.removeAttribute('animation__x');
+    K.setAttribute('animation__y', 'property: position; from: -0.3 0 0; to: -0.9 0 0; dur: 700; easing: easeOutQuad');
+    an(K.p, 's', 'rotation', '0 0 -4', '0 0 4', 250);
+    B.setAttribute('animation__x', 'property: position; from: 3.4 0 1; to: 1.2 0 1; dur: 1800; easing: easeInOutSine');
+  });
+  later(7300, () => { say(st, 'Segera aliri air!', '1.2 2.1 1', '#ffffff'); sub('Dinginkan luka dengan air mengalir. Ikuti 4 langkahnya!'); });
+  return 9300;
+};
+
+/* Keracunan: anak mengira cairan pembersih adalah minuman */
+CLIPS.racun = function (st) {
+  const g = mk('a-entity', { position: '0 0 0.22' }, st);
+  table(g, 0.35);
+  const bt = mk('a-entity', { position: '0.1 0.98 0' }, g);
+  mk('a-cylinder', { radius: 0.12, height: 0.4, color: '#16a34a' }, bt);
+  mk('a-cylinder', { radius: 0.05, height: 0.15, position: '0 0.275 0', color: '#15803d' }, bt);
+  mk('a-plane', { width: 0.14, height: 0.16, position: '0 0 0.121', color: '#ffffff' }, bt);
+  mk('a-text', { value: 'X', color: '#dc2626', width: 1.2, align: 'center', position: '0 0 0.124' }, bt);
+  const K = kid(st, -2.5, 0, 90, '#2563eb', '#f1c27d');
+  const B = kid(st, 3.4, 1, -90, '#ec4899', '#e0a96d');
+  K.setAttribute('animation__x', 'property: position; from: -2.5 0 0; to: -0.5 0 0; dur: 1800; easing: linear');
+  an(K.p, 'b', 'position', '0 0 0', '0 0.06 0', 160);
+  sub('Cairan pembersih diletakkan di tempat yang mudah dijangkau anak.');
+  later(1800, () => {
+    K.p.removeAttribute('animation__b');
+    cam([0.1, 1, 0.3], 3, 3.2, 1400);
+    sub('Kemasan berwarna cerah dan bertanda bahaya, tetapi anak belum paham.');
+  });
+  later(3700, () => {
+    cam(K0, 1.25, 7, 1400);
+    reach(K.p.armL, -1);
+    sub('Anak mengira isinya minuman dan membukanya.');
+  });
+  later(4700, () => {
+    bt.setAttribute('animation__m', 'property: position; from: 0.1 0.98 0; to: -0.25 1.28 -0.22; dur: 700; easing: easeInOutSine');
+    bt.setAttribute('animation__r', 'property: rotation; from: 0 0 0; to: 0 0 55; dur: 700');
+    K.p.armL.setAttribute('animation__c', 'property: rotation; from: 110 0 0; to: 40 0 0; dur: 700');
+    K.p.armL.setAttribute('animation__d', 'property: position; from: -0.3 1.3 0.28; to: -0.3 1.45 0.22; dur: 700');
+    sub('Ia meminumnya.');
+  });
+  later(5600, () => {
+    K.p.head.setAttribute('color', '#a3c76d');
+    an(K.p, 's', 'rotation', '0 0 -5', '0 0 5', 500);
+    const sp = mk('a-entity', { position: '0 2.15 0' }, K.p);
+    an(sp, 'r', 'rotation', '0 0 0', '0 360 0', 1800, 'dir: normal; easing: linear');
+    [0, 120, 240].forEach(a => {
+      const r = a * Math.PI / 180;
+      mk('a-sphere', { radius: 0.05, position: `${(0.3 * Math.cos(r)).toFixed(2)} 0 ${(0.3 * Math.sin(r)).toFixed(2)}`, color: '#facc15' }, sp);
+    });
+    bt.setAttribute('animation__m', 'property: position; from: -0.25 1.28 -0.22; to: 0.45 0.2 0.3; dur: 500; easing: easeInQuad');
+    bt.setAttribute('animation__r', 'property: rotation; from: 0 0 55; to: 0 0 80; dur: 500');
+    mk('a-circle', { radius: 0.25, rotation: '-90 0 0', position: '0.45 0.02 0.3', color: '#65a30d' }, g);
+    sub('Racun masuk ke tubuh: mual, pusing, dan lemas.');
+  });
+  later(6500, () => {
+    K.p.removeAttribute('animation__s');
+    K.removeAttribute('animation__x');
+    K.setAttribute('animation__c', 'property: rotation; from: 0 0 0; to: 0 0 70; dur: 900; easing: easeInQuad');
+    K.setAttribute('animation__y', 'property: position; from: -0.5 0 0; to: -0.5 0.15 0; dur: 900');
+    B.setAttribute('animation__x', 'property: position; from: 3.4 0 1; to: 1.2 0 1; dur: 1800; easing: easeInOutSine');
+    sub('Orang dewasa menemukan botolnya dan segera meminta bantuan.');
+  });
+  later(8000, () => { say(st, 'Cepat cari bantuan!', '1.2 2.1 1', '#ffffff'); sub('Jangan paksa muntah. Ikuti 4 langkahnya!'); });
+  return 9800;
+};
+
+/* Mimisan: hidung terbentur bola, pembuluh darah halus pecah */
+CLIPS.mimisan = function (st) {
+  const K = kid(st, 0, 0, 0, '#7c3aed', '#f1c27d');
+  const B = kid(st, 3, 0.5, -90, '#eab308', '#e0a96d');
+  const ball = mk('a-sphere', { radius: 0.12, position: '2.6 1.2 0.6', color: '#f97316' }, st);
+  let aw = null;
+  sub('Dua anak bermain lempar bola.');
+  later(50, () => cam(K0, 1.2, 7, 2000));
+  later(1200, () => ball.setAttribute('animation__t', 'property: position; from: 2.6 1.2 0.6; to: 0 1.28 0.3; dur: 900; easing: easeInQuad'));
+  later(2100, () => {
+    ball.setAttribute('animation__t', 'property: position; from: 0 1.28 0.3; to: -1.8 0.15 1; dur: 800; easing: easeOutQuad');
+    an(K.p, 's', 'rotation', '0 0 -3', '0 0 3', 200);
+    mk('a-sphere', { radius: 0.03, position: '0 1.68 0.21', color: '#dc2626' }, K.p);
+    drops(K.p, '#dc2626', 0, 1.7, 1.0, 0.25, 3, 1100, 0.03);
+    aw = say(st, 'AWW!', '0.6 2 0.3', '#ef4444');
+    sub('Bola mengenai hidung!');
+  });
+  later(2800, () => {
+    cam([0, 1.28, 0.2], 3.5, 3.2, 1500);
+    sub('Pembuluh darah halus di hidung mudah pecah, sehingga darah menetes.');
+  });
+  later(5200, () => {
+    rm(st, aw);
+    cam(K0, 1.3, 7, 1500);
+    K.p.armR.setAttribute('position', '0.2 1.55 0.2'); K.p.armR.setAttribute('rotation', '65 0 15');
+    B.setAttribute('animation__x', 'property: position; from: 3 0 0.5; to: 1 0 0.5; dur: 1500; easing: easeInOutSine');
+    sub('Anak panik memegang hidungnya. Temannya datang membantu.');
+  });
+  later(6800, () => { say(st, 'Duduk dulu, jangan mendongak!', '1 2.1 0.5', '#ffffff'); sub('Duduk condong ke depan. Ikuti 4 langkahnya!'); });
+  return 9000;
+};
+
+/* Tersedak: permen masuk ke saluran napas (diagram penampang) */
+CLIPS.tersedak = function (st) {
+  const K = kid(st, -0.6, 0, 0, '#dc2626', '#f1c27d');
+  const B = kid(st, 3.4, 0.8, -90, '#eab308', '#e0a96d');
+  const food = mk('a-sphere', { radius: 0.06, position: '-0.38 0.9 0.2', color: '#f59e0b' }, st);
+  let dg = null;
+  sub('Anak makan permen sambil tertawa dan berlari-lari.');
+  later(50, () => cam(K0, 1.25, 7, 2000));
+  later(1200, () => food.setAttribute('animation__m', 'property: position; from: -0.38 0.9 0.2; to: -0.6 1.25 0.17; dur: 800; easing: easeInOutSine'));
+  later(2100, () => {
+    food.setAttribute('visible', false);
+    sub('Permen terdorong ke saluran napas, bukan ke saluran makan.');
+    dg = mk('a-entity', { position: '0.7 1.3 0.3' }, st);
+    mk('a-cylinder', { radius: 0.08, height: 0.7, color: '#fca5a5' }, dg);
+    mk('a-text', { value: 'Saluran napas', width: 1.6, align: 'center', color: '#7f1d1d', position: '0 0.5 0' }, dg);
+    const f = mk('a-sphere', { radius: 0.09, position: '0 0.35 0', color: '#f59e0b' }, dg);
+    f.setAttribute('animation__m', 'property: position; from: 0 0.35 0; to: 0 -0.1 0; dur: 1200; delay: 300; easing: easeInQuad');
+    [-0.03, 0, 0.03].forEach((x, i) => {
+      const a = mk('a-sphere', { radius: 0.03, position: `${x} 0.3 0`, color: '#38bdf8' }, dg);
+      an(a, 'a', 'position', `${x} 0.3 0`, `${x} 0.05 0`, 500, `dir: alternate; easing: easeInOutSine; delay: ${1500 + i * 120}`);
+    });
+  });
+  later(2500, () => cam([0.7, 1.3, 0.3], 3, 3.2, 1500));
+  later(3600, () => sub('Udara tidak bisa lewat. Anak tidak bisa bicara maupun batuk.'));
+  later(5300, () => {
+    rm(st, dg);
+    cam(K0, 1.25, 7, 1500);
+    K.p.head.setAttribute('color', '#9db4e0');
+    K.p.armL.setAttribute('position', '-0.2 1.55 0.2'); K.p.armL.setAttribute('rotation', '65 0 -15');
+    K.p.armR.setAttribute('position', '0.2 1.55 0.2'); K.p.armR.setAttribute('rotation', '65 0 15');
+    an(K.p, 's', 'position', '-0.04 0 0', '0.04 0 0', 110);
+    say(st, '!', '-0.6 2.4 0', '#ef4444');
+    B.setAttribute('animation__x', 'property: position; from: 3.4 0 0.8; to: 0.9 0 0.8; dur: 1800; easing: easeInOutSine');
+    sub('Wajah membiru dan tangan memegang leher. Segera tolong!');
+  });
+  later(7200, () => { say(st, 'Dia tersedak! Tolong!', '0.9 2.1 0.8', '#ffffff'); sub('Tepuk punggung dan hentakan perut. Ikuti 4 langkahnya!'); });
+  return 9500;
+};
+
+
+/* ================= BUILD HALAMAN ================= */
+function showInfo(page, title, sub, body) {
+  page._title.setAttribute('value', title);
+  page._sub.setAttribute('value', sub);
+  page._body.setAttribute('value', body);
+}
+
+function buildCasePage(key) {
+  const C = CASES[key];
+  const page = pages[key] = mk('a-entity', { visible: false });
+  const model = mk('a-entity', { position: '0 0 -6', scale: '1.5 1.5 1.5' }, page);
+  C.build(model);
+  model._y = 0;
+
+  C.steps.forEach((s, i) => {
+    const hp = mk('a-entity', { position: HP[i].join(' ') }, model);
+    mk('a-sphere', { radius: 0.1, material: 'shader: flat; color: #ffd166; depthTest: false; transparent: true; opacity: 0.95',
+      animation: 'property: scale; from: 1 1 1; to: 1.5 1.5 1.5; dir: alternate; loop: true; dur: 700' }, hp);
+    mk('a-text', { value: String(i + 1), color: '#ffffff', width: 1.6, align: 'center', position: '0 0.2 0' }, hp);
+    const hit = mk('a-sphere', { radius: 0.3, material: 'transparent: true; opacity: 0; depthTest: false', class: 'btn', 'data-b': '' }, hp);
+    hit.addEventListener('click', () => showInfo(page, `${i + 1}. ${s[0]}`, C.name, s[1]));
+    hit.addEventListener('mouseenter', () => hp.setAttribute('scale', '1.4 1.4 1.4'));
+    hit.addEventListener('mouseleave', () => hp.setAttribute('scale', '1 1 1'));
+  });
+
+  /* Panel informasi (kiri) */
+  const pg = mk('a-entity', { position: '-2.8 1.7 -3.8', rotation: '0 30 0' }, page);
+  panel(pg, 2.8, 2.8, 0, 0);
+  page._title = text(pg, '', 0, 1.15, 2.6, { color: '#ffd166', 'wrap-count': 24 });
+  page._sub   = text(pg, '', 0, 0.88, 2.4, { color: '#7dd3fc', 'wrap-count': 40 });
+  page._body  = text(pg, '', -1.25, 0.68, 2.5, { align: 'left', anchor: 'left', baseline: 'top', 'wrap-count': 36, position: '-1.25 0.68 0.02' });
+  text(pg, 'Klik titik kuning bernomor untuk langkah penanganan.', 0, -0.95, 2.4, { color: '#9fb4ff', 'wrap-count': 46 });
+  btn(pg, '< Beranda', -0.95, 1.6, 0.8, 0.25, '#7c3aed', () => showPage('home'));
+  btn(pg, '< Putar', -0.95, -1.22, 0.8, 0.25, '#1d4ed8', () => turn(model, -45));
+  btn(pg, 'Ringkasan', 0, -1.22, 0.8, 0.25, '#047857', () => showInfo(page, C.name, C.region, C.summary));
+  btn(pg, 'Putar >', 0.95, -1.22, 0.8, 0.25, '#1d4ed8', () => turn(model, 45));
+  {
+    page._ui = { pg: pg, model: model };
+    page._skip = btn(page, 'Lewati >>', 0, 1.15, 0.8, 0.24, '#dc2626', () => stopClip(true));
+    page._skip.setAttribute('position', '0 1.15 -2.3');
+    btn(pg, 'Ulang Animasi', 0.85, 1.6, 0.95, 0.25, '#dc2626', () => startClip(key));
+  }
+}
+function turn(model, d) {
+  model._y += d;
+  model.setAttribute('animation__turn', `property: rotation; to: 0 ${model._y} 0; dur: 500; easing: easeInOutQuad`);
+}
+
+function buildHome() {
+  const home = pages.home = mk('a-entity', {});
+  const pg = mk('a-entity', { position: '0 3.2 -4' }, home);
+  panel(pg, 4.8, 1.6, 0, 0);
+  text(pg, 'PERTOLONGAN PERTAMA VR', 0, 0.55, 4.4, { color: '#ffd166', 'wrap-count': 26 });
+  text(pg, 'Simulasi animasi untuk mengenal penanganan pertama:\nluka jatuh, luka bakar, keracunan, mimisan, dan tersedak.', 0, 0.08, 4.2, { 'wrap-count': 60 });
+  text(pg, 'Klik salah satu simulasi di bawah, atau gunakan menu navigasi. Di mode VR, tatap objek 1,5 detik.\nMateri edukasi, bukan pengganti tenaga medis. Darurat: hubungi 112 / 119.', 0, -0.5, 4.0, { color: '#9fb4ff', 'wrap-count': 70 });
+
+  KEYS.forEach((k, i) => {
+    const x = (i - 2) * 1.3;
+    const g = mk('a-entity', { position: `${x} 1.1 -4`, scale: '0.35 0.35 0.35',
+      animation: 'property: rotation; to: 0 360 0; loop: true; dur: 24000; easing: linear' }, home);
+    CASES[k].build(g);
+    const hit = mk('a-sphere', { radius: 1.8, position: '0 1.3 0', material: 'transparent: true; opacity: 0', class: 'btn', 'data-b': '' }, g);
+    hit.addEventListener('click', () => showPage(k));
+    hit.addEventListener('mouseenter', () => g.setAttribute('scale', '0.4 0.4 0.4'));
+    hit.addEventListener('mouseleave', () => g.setAttribute('scale', '0.35 0.35 0.35'));
+    text(home, CASES[k].name, x, 0.85, 1.4, { position: `${x} 0.85 -3.9`, 'wrap-count': 14, color: '#ffd166' });
+  });
+}
+
+/* ================= KUIS ================= */
+let qi = 0, score = 0, answered = false;
+function buildQuiz() {
+  const quiz = pages.quiz = mk('a-entity', { position: '0 1.8 -3.2', visible: false });
+  panel(quiz, 3.4, 2.3, 0, 0);
+  btn(quiz, '< Beranda', -1.25, 1.32, 0.8, 0.25, '#7c3aed', () => showPage('home'));
+  quiz._head = text(quiz, '', 0, 0.9, 3.0, { color: '#ffd166', 'wrap-count': 40 });
+  quiz._q    = text(quiz, '', 0, 0.45, 2.8, { 'wrap-count': 38 });
+  quiz._opts = [0, 1, 2].map(i => btn(quiz, '', 0, 0.0 - i * 0.35, 2.4, 0.28, '#1d4ed8', () => answer(i)));
+  quiz._fb   = text(quiz, '', 0, -1.0, 2.8, { 'wrap-count': 44 });
+  quiz._next = btn(quiz, 'Lanjut', 1.2, -0.95, 0.9, 0.28, '#047857', () => {
+    if (qi >= QUIZ.length) startQuiz(); else { qi++; nextQuestion(); }
+  });
+}
+function startQuiz() { qi = 0; score = 0; nextQuestion(); }
+function nextQuestion() {
+  const z = pages.quiz;
+  answered = false;
+  z._fb.setAttribute('value', '');
+  setBtn(z._next, false);
+  if (qi >= QUIZ.length) {
+    z._head.setAttribute('value', 'KUIS SELESAI');
+    z._q.setAttribute('value', `Skor kamu: ${score} / ${QUIZ.length}\n` + (score >= 4 ? 'Hebat! Kamu siap memberi pertolongan pertama.' : 'Coba ikuti simulasi lagi lalu ulangi kuis.'));
+    z._opts.forEach(b => setBtn(b, false));
+    z._next._t.setAttribute('value', 'Ulangi');
+    setBtn(z._next, true);
+  } else {
+    const q = QUIZ[qi];
+    z._next._t.setAttribute('value', 'Lanjut');
+    z._head.setAttribute('value', `Pertanyaan ${qi + 1} / ${QUIZ.length}`);
+    z._q.setAttribute('value', q.q);
+    z._opts.forEach((b, i) => { b._t.setAttribute('value', q.o[i]); b.setAttribute('color', '#1d4ed8'); setBtn(b, true); });
+  }
+  refreshRay();
+}
+function answer(i) {
+  if (answered || qi >= QUIZ.length) return;
+  answered = true;
+  const z = pages.quiz, q = QUIZ[qi];
+  if (i === q.a) { score++; z._opts[i].setAttribute('color', '#16a34a'); z._fb.setAttribute('value', 'Benar!'); }
+  else { z._opts[i].setAttribute('color', '#dc2626'); z._opts[q.a].setAttribute('color', '#16a34a');
+         z._fb.setAttribute('value', 'Kurang tepat. Jawaban: ' + q.o[q.a]); }
+  setBtn(z._next, true);
+  refreshRay();
+}
+
+/* ================= INISIALISASI ================= */
+scene.addEventListener('loaded', () => {
+  buildHome();
+  KEYS.forEach(buildCasePage);
+  buildQuiz();
+
+  const nav = mk('a-entity', { position: '0 0.8 -2.3', rotation: '-30 0 0' });
+  [['Beranda', 'home'], ['Jatuh', 'jatuh'], ['Bakar', 'bakar'], ['Racun', 'racun'], ['Mimisan', 'mimisan'], ['Sedak', 'tersedak'], ['Kuis', 'quiz']]
+    .forEach((it, i) => btn(nav, it[0], (i - 3) * 0.58, 0, 0.55, 0.22, '#334155', () => showPage(it[1]), true));
+
+  const gaze = document.getElementById('cursor-gaze');
+  const mouse = document.getElementById('cursor-mouse');
+  scene.addEventListener('enter-vr', () => {
+    gaze.setAttribute('visible', true);
+    gaze.setAttribute('raycaster', 'enabled', true);
+    mouse.setAttribute('raycaster', 'enabled', false);
+    refreshRay();
+  });
+  scene.addEventListener('exit-vr', () => {
+    gaze.setAttribute('visible', false);
+    gaze.setAttribute('raycaster', 'enabled', false);
+    mouse.setAttribute('raycaster', 'enabled', true);
+    refreshRay();
+  });
+
+  /* Overlay sinematik di kamera: bilah letterbox, subtitle, dan fade hitam */
+  const camEl = document.querySelector('a-camera');
+  clip.bars = mk('a-entity', { visible: false }, camEl);
+  [0.43, -0.43].forEach(y => mk('a-plane', { width: 4, height: 0.14, position: `0 ${y} -0.6`, material: 'color: #000; shader: flat' }, clip.bars));
+  clip.ov = mk('a-entity', { visible: false }, camEl);
+  clip.back = mk('a-plane', { width: 1.05, height: 0.075, position: '0 -0.3 -0.6', visible: false,
+    material: 'color: #000; shader: flat; transparent: true; opacity: 0.55; depthWrite: false' }, clip.ov);
+  clip.sub = mk('a-text', { value: '', align: 'center', color: '#ffffff', width: 1, 'wrap-count': 50, position: '0 -0.3 -0.598' }, clip.ov);
+  clip.fade = mk('a-plane', { width: 4, height: 4, position: '0 0 -0.3',
+    material: 'color: #000; shader: flat; transparent: true; opacity: 0; depthWrite: false' }, camEl);
+  scene.addEventListener('enter-vr', () => clip.bars.setAttribute('visible', false));
+
+  showPage('home');
+});
+</script>
+</body>
+</html>
